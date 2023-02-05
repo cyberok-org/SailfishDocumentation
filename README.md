@@ -1,6 +1,6 @@
 <h1 align="center">SailFish Documentation</h1>
 
-Все графы будут сгенерированы для следующего котракта и функции withdrawBalance (если не приведён какой-то другой пример):
+Все графы будут сгенерированы для следующего контракта и функции withdrawBalance (если не приведён какой-то другой пример):
 
 ```solidity
 pragma solidity ^0.4.24;
@@ -166,55 +166,73 @@ successor._pred_state_var_used.update(basic_block._state_vars_used)
 
 ## Построение *Compose* графа
 
+Интуитивно ***Compose*** граф (или ***Compose SDG***) -- это попытка сэмулировать ***SDG*** при вызове некоторых публичных функций в `fallback`-функции или вызове некоторой удаленной процедуры. В `SailFish` сейчас проверяется только вызов одной публичной функции, но, кажется, данное поведение не так сложно изменить. 
 
-В этом модуле пытаются склеить по $2$ функции.
+Данное построение выполняется с помощью функции `generate_composed_sdg` в `main_helper.py`, которая действует в несколько этапов и использует следующие функции:
+- `analyze_external_call` из `main_helper.py`, которая использует `analyze_call_destination` и `analyze_lowlevelcall_gas` из `main_helper.py` (которые еще что то далее используют, например функции из `Slither`)
+- Конструктор структуры `Compose` из `compose.py`, который использует функцию `setup`, которая использует функцию `build_composed_sdg`, которая использует функции `get_dao_composed_sdg` и `get_tod_composed_sdg`
+
+Все эти функции и их роли будут подробнее разобраны далее:
+
+
+### Функция *generate_composed_sdg*
+
 
 1. Идёт отбрасывание приватных функций и конструкторов.
 
-2. Если в функции имеется `external_call`, то делаются `analyze_call_destination` и `analyze_lowlevelcall_gas` для этой функции.
-
-***Замечание**: в этих функциях используется `Slither`.*
+2. Если в функции имеется `external_call`, то вызывается функция `analyze_external_call`. Эта функция, если вызов создает новый контракт, создает и добавляет в имеющийся ***SDG*** соответствующий подграф, иначе вызываются функции `analyze_call_destination` и `analyze_lowlevelcall_gas` для рассматриваемого блока.
+ 
+   ***Замечание**: в последних двух функциях используется `Slither`.*
 
 3. Если функция отправляет `ether` или имеет `external_call`, то для неё создаётся стуктура `Compose`, которая запоминается в `composed_sdg[function]`.
 
 
-### Что происходит в Compose
+### Конструктор структуры *Compose*
 
 
-Вызывается метод `build_composed_sdg`, в котором
+Инициализируют некоторые поля, после чего вызывает функцию-член `setup()` для заполнения этих полей.
 
-a. Среди всех `matching_sdg` выделяют общие переменные.
 
-b. Получаем вершины инструкций для `target_sdg`, который анализируется на предмет уязвимости
+### Функция *setup*
 
-c. При наличии `external_call`, вызывается `self.get_dao_composed_sdg`. Результат запоминается в `self._dao_composed_sdgs` и 
 
-`self._dao_composed_sdg_to_call_predecessors`.
+Обертка над функцией `build_сomposed_sdg`, которая после работы функции дополнительно генерирует рисунки с помощью функции `print_sdg_dot`.
 
-### Что происходит в `get_dao_composed_sdg`
 
-Создаётся словарь словарей `composed_sdgs`. Первым ключём является функция, для которой мы создавали `Compose` (`self._sdg_obj._function`), второй ключ -- сопоставляемая ей функция (`matching_sdg_obj._function`). Значением же является *tuple* из 4 элементов -- `(composed_sdg, graph_node, modified_sdg, matching_sdg)`.
+### Функция *build_composed_sdg*
 
-Перебираются вершины из `target_sdg`. Анализ начнётся только если тип инструкции в этой вершине имеет значение `LowLevelCall` или `HighLevelCall`.
 
-Если все проверки прошли, то находятся все вершины, которые появляются после `external_call`. Точно так же и те, что были до него, включая вершину с `external_call`.
+1. Собирает список всех ***SDG***, а так же всех их вершин с данными и инструкциями. 
+2. Собранные данные потенциально передаются в $2$ функции:
+   - При установленных флагах `dao` и `external_call` вызывается функция `get_dao_composed_sdg`, которая заполняет поля `self._dao_composed_sdgs` и 
+   `self._dao_composed_sdg_to_call_predecessors`
+   - При установленных флагах `tod` и `is_ether_sending` вызывается функция `get_dao_composed_sdg`, которая заполняет поля `self._tod_composed_sdgs` и 
+   `self._tod_composed_sdg_to_call_predecessors`
 
-Если функции `matching_sdg_obj._function` и `self._sdg_obj._function` совпадают, то надо сделать копию графа.
 
-Далее `composed_sdg = nx.compose(modified_sdg, matching_sdg)` -- для вставки `matching_sdg`.
+### Функция *get_dao_composed_sdg*
 
+1. Создаётся словарь словарей `composed_sdgs`. Первым ключём является функция, для которой мы создавали `Compose` (далее `target_sdg`), второй ключ -- сопоставляемая ей функция. Значением же является *tuple* из 4 элементов -- `(composed_sdg, graph_node, modified_sdg, matching_sdg)`.
+
+2. Перебираются вершины c инструкциями из `target_sdg`. Анализ начнётся только если тип инструкции в этой вершине имеет значение `LowLevelCall` или `HighLevelCall`. Для анализа создается копия `target_sdg` под названием `modified_sdg`.
+
+3. Если все проверки прошли, то находятся все вершины, которые стоят не позже вершины с `external_call`. После этого из `modified_sdg` удаляются все ребра до хранилища, не исользуемые найденными вершинами (оптимизация).
+
+4. Далее перебираются все кандидаты `matching_sdg` на подстановку вместо внешнего вызова. Они переданы списком через аргумент `all_sdgs` нашей функции. 
+
+5. Граф `matching_sdg` вставляется в `modified_sdg` с помощью встроенной в библиотеку `networkx` функции `compose(modified_sdg, matching_sdg)`. Результат записывается в локальную переменную `composed_sdg`.
+
+6. Удаляются лишние ребра и добавляются пометки на ребрах:
 ```python
 self.remove_edges(composed_sdg, [graph_node], successors)
 self.add_src_to_dest_edges(composed_sdg, [graph_node], root_nodes, function_start)
 self.add_src_to_dest_edges(composed_sdg, leaf_nodes, successors, function_end)
 ```
 
-*(Ещё немного обработки рёбер)*
+7. Структура `composed_sdgs` дополняется полученным *tuple* `(composed_sdg, graph_node, modified_sdg, matching_sdg)`.
 
-Пополнение `composed_sdgs` полученным *tuple* `(composed_sdg, graph_node, modified_sdg, matching_sdg)`.
-
-После обработки сопоставляемых функций, если установлен флаг `_dump_graph`, нарисуются соответствующие графы.
 
 ## Нахождение уязвимостей в блоке `detection`
+
 
 TODO
