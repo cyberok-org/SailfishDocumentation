@@ -96,6 +96,10 @@ contract Foo {
 - ***ICFG***:
 <img src="./graphsPictures/functionWithPublicFunction_icfg.png" width="35%">
 
+### Изменения
+
+Добавлена функция для склейки 2 ***ICFG*** графов. Применяется лишь в Функции *output_paths* в блоке *detection*.
+
 
 ## Построение *range* графа
 
@@ -125,10 +129,6 @@ function withdrawAllBalance() public {
 <img src="./graphsPictures/withdrawAllBalance_range_3.png" width="70%">
 <img src="./graphsPictures/withdrawAllBalance_range_4.png" width="70%">
 <img src="./graphsPictures/withdrawAllBalance_range_5.png" width="70%">
-
-### Изменения
-
-Добавлена функция для склейки 2 ***ICFG*** графов. Применяется лишь в Функции *output_paths* в блоке *detection*.
 
 ## Построение *SDG*
 
