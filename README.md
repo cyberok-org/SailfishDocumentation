@@ -126,6 +126,9 @@ function withdrawAllBalance() public {
 <img src="./graphsPictures/withdrawAllBalance_range_4.png" width="70%">
 <img src="./graphsPictures/withdrawAllBalance_range_5.png" width="70%">
 
+### Изменения
+
+Добавлена функция для склейки 2 ***ICFG*** графов. Применяется лишь в Функции *output_paths* в блоке *detection*.
 
 ## Построение *SDG*
 
@@ -231,6 +234,10 @@ self.add_src_to_dest_edges(composed_sdg, leaf_nodes, successors, function_end)
 
 7. Структура `composed_sdgs` дополняется полученным *tuple* `(composed_sdg, graph_node, modified_sdg, matching_sdg)`.
 
+### Изменения
+
+Была измененеа функция `get_dao_composed_sdg`. В пункте 4. теперь перебираются 2 фунуции `matching_sdg`. Из этих двух функиций делается композиция (каждый выход одной функции соединяется ребром с каждым входом другой функции). Далее Этот результат соединяется с первой функцией точно так же, как и в оригинальном sailfish. На выходе получаются *tuple* большей длины, так как в них добавляется тертья функция и результат промежуточной композиции.
+
 
 ## Нахождение уязвимостей в блоке *detection*
 
@@ -245,3 +252,7 @@ self.add_src_to_dest_edges(composed_sdg, leaf_nodes, successors, function_end)
 ### Функция *output_paths*
 
 Для начала берутся все вершины из `primary_icfg`, которые лежат на пути от начала функции до вызова *call* и запомаинаются в `subgraph_1`. Затем берутся вершины из `matching_icfg` между началом этой функции и до конца `start_node`, в которой наблюдается первое ребро D/W. Затем бурутся все вершины на пути из `start_node` до конца `matching_function`. Результат запоминается в `subgraph_2`. Далее `subgraph_1` и `subgraph_2` соездиняются по `call_node` в `composed_graph_12`. Далее берутся все вершины на пути из вызова *call* до `end_node`, где наблюдается второе ребро D/W. Результат запоминается в `subgraph_3`, который потом скрепляется с `composed_graph_12` и получается `composed_graph_123`, который и является рузультатом *output_paths*.
+
+### Изменения
+
+Для начала идёт склейка 2 'matching_icfg', а дальше всё идёт точно так же, как и в функции выше. Так же немного попрвлен вывод графов, чтобы из названия файла было видно все 3 используемые функции.
