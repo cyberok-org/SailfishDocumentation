@@ -41,6 +41,7 @@ class Detection:
         self.dao_symex_paths = {}
         self.tod_per_function_paths = {}
         self.tod_symex_paths = {}
+        self.counter = 0
 
         self._dump_graph = dump_graph
         self.dao_feasible_paths = {}
@@ -341,6 +342,8 @@ class Detection:
         composed_graph_123 = self.connect_two_graphs(composed_graph_12, subgraph_3)
         #primary_icfg_obj.print_icfg_dot(self._graph_dir, primary_function, composed_graph_123, 'icfg_dummy')
 
+        matched_icfg_obj.recover()
+
         return composed_graph_123
 
     def connect_callnode(self, source_subgraph, leaf_node, target_subgraph):
@@ -567,12 +570,14 @@ class Detection:
                                 except:
                                     traceback.print_exc()
                                     sys.exit(1)
-                                
+                                self.counter += 1
+
                                 if has_path:
                                     composed_graph = self.output_paths(matched_function, start_node, primary_function, end_node, call_node, all_predecessors, function_2_sdg, function_3_sdg)
                                     tuple_pair = (primary_function, matched_function, composed_graph, function_3_sdg)
                                     self.generate_symex_json(var_node, tuple_pair, 'dao')
                                     self.dao_count += 1
+                                    self.print_my_detection(self._graph_dir, primary_function, matched_function, composed_graph, "_comp_name")
 
                                     #if var_node not in self.dao_feasible_paths.keys():
                                         #self.dao_feasible_paths[var_node] = []
@@ -666,5 +671,33 @@ class Detection:
             png_file_name = function_1.name + "_" + function_2.name + name + ".png"
         else:
             png_file_name = function_1.name + "_" + function_3._function.name + "_" + function_2.name + name + ".png"
+        png_file_path = os.path.join(graph_dir, png_file_name)
+        dot_graph.write_png(png_file_path)
+
+    def print_my_detection(self, graph_dir, function_1, function_2, graph, name=None):
+        content = ''
+        styles = ['dashed']
+        # Ref: https://stackoverflow.com/questions/33722809/nx-write-dot-generates-redundant-nodes-when-input-nodes-have-a-colon
+        dot_file_name = function_1.name + "_" + function_2.name + name + ".dot"
+        dot_file_path = os.path.join(graph_dir, dot_file_name)
+
+        with open(dot_file_path, 'w', encoding='utf8') as fp:
+            nx.drawing.nx_pydot.write_dot(graph, fp)
+
+        (dot_graph,) = pydot.graph_from_dot_file(dot_file_path)
+
+        # Ref: https://github.com/pydot/pydot/issues/169
+        for i, node in enumerate(dot_graph.get_nodes()):
+            node.set_shape('box')
+
+        for i, edge in enumerate(dot_graph.get_edges()):
+            key = edge.get('key')
+
+            if key == 'D' or key == 'W':
+                edge.set_style(styles[0])
+
+            edge.set_label(edge.get('key'))
+
+        png_file_name = "debud_detection_" + function_1.name + "_" + function_2.name + name + ".png"
         png_file_path = os.path.join(graph_dir, png_file_name)
         dot_graph.write_png(png_file_path)

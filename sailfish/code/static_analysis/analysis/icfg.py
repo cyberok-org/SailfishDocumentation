@@ -51,7 +51,14 @@ class ICFG:
         self._result_dir = graph_dir
         self._visit_stack = []
         self._recursion_present = False
+        self.locals_to_declare_flag = True
         self.setup()
+
+        self._root_nodes_for_recover = []
+        self._leaf_nodes_for_recover = []
+        self._all_predecessors_for_recover = {}
+        self._all_successors_for_recover = {}
+        self._function_icfg_for_recover = None
     
     def get_index(self, graph):
         index = 0
@@ -168,8 +175,8 @@ class ICFG:
                         else:
                             if type(var_used).__name__ == 'LocalVariableSolc':
                                 rvalue_locals.append(var_used)
-
-        ICFG.locals_to_declare[self._function] = list(set(rvalue_locals))
+        if self.locals_to_declare_flag:
+            ICFG.locals_to_declare[self._function] = list(set(rvalue_locals))
 
     # This function inline the caller cfg with teh caller cfg at the place of the interprocedural call
     def inline_cfg(self, icfg, cfg_to_modify, call_basic_block, copy_basic_block, return_basic_block, function_ref, compose='N'):
@@ -537,32 +544,50 @@ class ICFG:
         dot_graph.write_png(png_file_path)
 
     def connect_icfg(self, matching_icfg):
-        call_context = []
+        self._root_nodes_for_recover = copy.copy(self._root_nodes)
+        self._function_icfg_for_recover = copy.copy(self._function_icfg)
+        self._leaf_nodes_for_recover = copy.copy(self._leaf_nodes)
+        self._all_predecessors_for_recover = copy.copy(self._all_predecessors)
+        self._all_successors_for_recover = copy.copy(self._all_successors)
+
+        matching_icfg._root_nodes_for_recover = copy.copy(matching_icfg._root_nodes)
+        matching_icfg._function_icfg_for_recover = copy.copy(matching_icfg._function_icfg)
+        matching_icfg._leaf_nodes_for_recover = copy.copy(matching_icfg._leaf_nodes)
+        matching_icfg._all_predecessors_for_recover = copy.copy(matching_icfg._all_predecessors)
+        matching_icfg._all_successors_for_recover = copy.copy(matching_icfg._all_successors)
+
         matcing_root = matching_icfg._root_nodes
-        target_root = self._root_nodes
-        matcing_leaf = matching_icfg._leaf_nodes
+        matcing_leaf = copy.deepcopy(matching_icfg._leaf_nodes)
         target_leaf = self._leaf_nodes
-        self._function_icfg = nx.compose(self._function_icfg, matching_icfg._function_icfg)
+        _function_icfg = self._function_icfg
+        self._function_icfg = nx.compose(self._function_icfg, copy.copy(matching_icfg._function_icfg))
         self._leaf_nodes = matcing_leaf
-        # self.add_src_to_dest_edges(self._function_icfg, target_leaf, matcing_root)
+        self.add_src_to_dest_edges(self._function_icfg, target_leaf, matcing_root)
         self._leaf_nodes = []
         self._root_nodes = []
         self._all_predecessors = {}
         self._all_successors = {}
+        self.locals_to_declare_flag = False
         self.visit_nodes()
         compute_ancesters_decendents(self._function_icfg, self._leaf_nodes, self._root_nodes, self._all_predecessors,
                                      self._all_successors)
         convert_set_to_list(self._all_predecessors)
         convert_set_to_list(self._all_successors)
         ICFG.icfg_objects[self._function] = self
+        matching_icfg.recover()
         self.print_icfg_my(self._result_dir, "two_functions_icfg", self._function_icfg)
-        print(self._leaf_nodes)
-        print(self._root_nodes)
 
     def add_src_to_dest_edges(self, graph, src_nodes, dest_nodes):
         for src_node in src_nodes:
             for dest_node in dest_nodes:
                 graph.add_edge(src_node, dest_node)
+
+    def recover(self):
+        self._root_nodes = copy.copy(self._root_nodes_for_recover)
+        self._function_icfg = copy.copy(self._function_icfg_for_recover)
+        self._leaf_nodes = copy.copy(self._leaf_nodes_for_recover)
+        self._all_predecessors = copy.copy(self._all_predecessors_for_recover)
+        self._all_successors = copy.copy(self._all_successors_for_recover)
 
     def print_icfg_my(self, graph_dir, function_name, graph, name=None):
         content = ''

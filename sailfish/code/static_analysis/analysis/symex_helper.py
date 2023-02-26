@@ -1451,6 +1451,7 @@ def output_dao_paths(slither_obj, file_n, result_dir, log, global_vars, global_c
     dest_node = []
 
     total_block_instructions = 0
+    print_my_detection(result_dir, primary_function, matched_function, graph, "random_name")
 
     for node in graph.nodes:
         if node not in json_blocks_mapping.keys():
@@ -1473,7 +1474,10 @@ def output_dao_paths(slither_obj, file_n, result_dir, log, global_vars, global_c
                 locals_undeclared = ICFG.locals_to_declare[primary_function]
 
             else:
-                locals_undeclared = ICFG.locals_to_declare[matched_function]
+                locals_undeclared = list(set(ICFG.locals_to_declare[matched_function] + ICFG.locals_to_declare[function_3_sdg._function]))
+                print(str(len(ICFG.locals_to_declare[matched_function])) + " matcing_function_icfg_len")
+                print(str(len(ICFG.locals_to_declare[function_3_sdg._function])) + " function_3_sdg._function_icfg_len")
+                print(str(len(locals_undeclared)) + " final_len")
 
         for local_d in locals_undeclared:
             if type(local_d.type).__name__ == 'ElementaryType':
@@ -1621,6 +1625,8 @@ def get_scope_for_blocks(path_graph, node, function_name_1, function_name_2):
 
     return scope_str
 
+
+
 def populate_output_paths(src_node, dest_node, variable, primary_function, matched_function, total_instructions, output_json, bug_type):
     symex_json = {}
     #symex_json['contract'] = output_json['contract']
@@ -1637,5 +1643,33 @@ def populate_output_paths(src_node, dest_node, variable, primary_function, match
     symex_json['result'] = ""
     symex_json['execution_details'] = ""
     return symex_json
+
+def print_my_detection(graph_dir, function_1, function_2, graph, name=None):
+    content = ''
+    styles = ['dashed']
+    # Ref: https://stackoverflow.com/questions/33722809/nx-write-dot-generates-redundant-nodes-when-input-nodes-have-a-colon
+    dot_file_name = function_1.name + "_" + function_2.name + name + ".dot"
+    dot_file_path = os.path.join(graph_dir, dot_file_name)
+
+    with open(dot_file_path, 'w', encoding='utf8') as fp:
+        nx.drawing.nx_pydot.write_dot(graph, fp)
+
+    (dot_graph,) = pydot.graph_from_dot_file(dot_file_path)
+
+    # Ref: https://github.com/pydot/pydot/issues/169
+    for i, node in enumerate(dot_graph.get_nodes()):
+        node.set_shape('box')
+
+    for i, edge in enumerate(dot_graph.get_edges()):
+        key = edge.get('key')
+
+        if key == 'D' or key == 'W':
+            edge.set_style(styles[0])
+
+        edge.set_label(edge.get('key'))
+
+    png_file_name = "debud_detection_" + function_1.name + "_" + function_2.name + name + ".png"
+    png_file_path = os.path.join(graph_dir, png_file_name)
+    dot_graph.write_png(png_file_path)
 
 

@@ -117,7 +117,7 @@ def analyze_contracts(contract_path, patterns, output_dir, range_type, dump_grap
             #dao_symex_paths, dao_per_function_paths, tod_symex_paths, tod_per_function_paths = output_ir_paths_new(slither_obj, generated_vrg, detection.dao_feasible_paths, detection.tod_feasible_paths, contract_name, graph_dir, log)
             dump_json(graph_dir, detection.dao_symex_paths, 'dao_path_info.json')
             dump_json(graph_dir, detection.tod_symex_paths, 'tod_path_info.json')
-            return
+            # return
 
             # Record analysis duration
             end_time = time.time()
